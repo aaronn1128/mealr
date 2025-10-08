@@ -1,9 +1,10 @@
-<!DOCTYPE html>
+# Mealr v16: Full build (Distance + Places + bugfixes) + Modal z-index + Instant language switch
+html = r"""<!DOCTYPE html>
 <html lang="zh">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum=1, user-scalable=no" />
-<title>Mealr v13 (Mobile + Google Places)</title>
+<title>Mealr v16 (Full)</title>
 <style>
   :root {
     --bg:#1b0f0a; --fg:#fff6f0; --muted:#ffddc9;
@@ -29,7 +30,7 @@
   .stack{position:relative; flex:1 1 auto; margin:12px; border-radius:16px;}
   .swipe-card{position:absolute; inset:0; background:var(--card); border:1px solid rgba(255,255,255,.12); border-radius:16px; padding:16px;
     box-shadow:0 14px 40px rgba(0,0,0,.55); display:flex; flex-direction:column; gap:8px; touch-action:none;
-    transition: transform .25s ease, opacity .25s ease;}
+    transition: transform .25s ease, opacity .25s ease; z-index: 100; } /* keep under modals */
   .title{font-size:clamp(18px, 3.5vw, 22px); font-weight:800;}
   .meta{color:var(--muted); font-size:clamp(12px, 2.6vw, 13px); display:flex; gap:10px; align-items:center;}
   .price{font-weight:800; color:#ffd29b;}
@@ -46,11 +47,11 @@
   .badge.like{left:14px; color:#063; border-color:var(--like); background:rgba(110,231,168,.12);}
   .badge.nope{right:14px; color:#6b0000; border-color:var(--nope); background:rgba(252,165,165,.12); transform:rotate(15deg);}
 
-  .overlay{position:fixed; inset:0; background:rgba(0,0,0,.45); display:none; z-index:20; opacity:0; transition:opacity .25s ease;}
+  .overlay{position:fixed; inset:0; background:rgba(0,0,0,.45); display:none; z-index:2000; opacity:0; transition:opacity .25s ease;} /* high */
   .overlay.active{display:block; opacity:1;}
   .modal{position:fixed; left:50%; transform:translate(-50%, 20px); top:60px; width:360px; max-width:94vw;
-    background:linear-gradient(180deg,#341e15,#24130d); border:1px solid rgba(255,255,255,.14); border-radius:16px; padding:14px; z-index:21; display:none;
-    opacity:0; transition: transform .25s ease, opacity .25s ease;}
+    background:linear-gradient(180deg,#341e15,#24130d); border:1px solid rgba(255,255,255,.14); border-radius:16px; padding:14px; z-index:2001; display:none;
+    opacity:0; transition: transform .25s ease, opacity .25s ease; color: var(--fg);} /* high */
   .modal.active{display:block; opacity:1; transform:translate(-50%, 0);}
   .label{font-size:12px; color:var(--muted); margin:8px 0 6px; text-transform:uppercase; letter-spacing:.08em;}
   .pill{background:var(--chip); border:1px solid rgba(255,255,255,.18); border-radius:999px; padding:8px 12px; color:var(--fg); font-size:14px; cursor:pointer;}
@@ -76,19 +77,17 @@
   .card{background:var(--card); border:1px solid rgba(255,255,255,.12); border-radius:16px; padding:16px; box-shadow:0 14px 40px rgba(0,0,0,.55);
     animation: fadeIn .25s ease;}
   .hero{width:100%; height:170px; border-radius:12px; object-fit:cover; margin-bottom:10px; border:1px solid rgba(255,255,255,.12); display:none;}
+  .kv{margin-top:8px; color:#ffe7d6; font-size:14px;}
+  .kv small{color:var(--muted); font-size:12px; display:block; margin-top:2px;}
   .result-controls{display:flex; gap:10px; margin-top:12px; flex-wrap:wrap;}
   .result-actions{display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;}
-  .list-item{display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px dashed rgba(255,255,255,.12);}
+  .list-item{display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px dashed rgba(255,255,255,.12); color:var(--fg);}
   .list-meta{font-size:12px; color:var(--muted);}
 
   .action-btn{flex:1; display:inline-flex; align-items:center; justify-content:center; gap:8px;
-    background:var(--btn); border:1px solid rgba(255,255,255,.18); color:var(--fg); padding:10px 14px; border-radius:12px; font-weight:700; cursor:pointer;}
+    background:var(--btn); border:1px solid rgba(255,255,255,.18); color:var(--fg); padding:10px 14px; border-radius:12px; font-weight:700; cursor:pointer; text-decoration:none;}
   .action-btn.primary{background:linear-gradient(180deg,var(--primary),var(--primary-2)); color:#220b07; border:none; box-shadow:0 6px 20px rgba(255,90,95,.18);}
   .action-icon{font-size:16px;}
-  .kv{margin-top:8px; color:#ffe7d6; font-size:14px;}
-  .kv small{color:var(--muted); font-size:12px; display:block; margin-top:2px;}
-
-  @keyframes fadeIn{from{opacity:0; transform:translateY(8px);} to{opacity:1; transform:translateY(0);}}
 </style>
 </head>
 <body>
@@ -124,7 +123,7 @@
       <div class="result-actions">
         <button id="btnMap" class="action-btn"><span class="action-icon">📍</span>開地圖</button>
         <button id="btnCall" class="action-btn"><span class="action-icon">📞</span>打電話</button>
-        <a id="btnWebsite" class="action-btn" target="_blank" rel="noopener" style="text-decoration:none;"><span class="action-icon">🌐</span>官網</a>
+        <a id="btnWebsite" class="action-btn" target="_blank" rel="noopener"><span class="action-icon">🌐</span>官網</a>
       </div>
     </section>
   </div>
@@ -145,6 +144,11 @@
       <div class="row"><span id="budgetShow" class="pill">≤ 300</span></div>
       <input id="budget" type="range" min="120" max="1000" step="10" value="300" />
       <div class="hint" id="hintBudget">拖曳設定你的最高花費。</div>
+
+      <div class="label" id="lblDistance">距離（公里）</div>
+      <div class="row"><span id="distanceShow" class="pill">≤ 2.0 km</span></div>
+      <input id="distance" type="range" min="200" max="2000" step="100" value="2000" />
+      <div class="hint" id="hintDistance">需允許定位與店家有座標；否則不會套用。</div>
 
       <div class="label" id="lblVibe">氛圍</div>
       <div class="row" id="vibeRow">
@@ -196,7 +200,7 @@
 
 <script>
 // ====== CONFIG ======
-const GOOGLE_API_KEY = ""; // ← 放你的 Google Maps/Places API Key
+const GOOGLE_API_KEY = ""; // set to enable Places
 const USE_PLACES = !!GOOGLE_API_KEY;
 
 // ====== I18N ======
@@ -207,19 +211,24 @@ const I18N = {
        todaysPick:"今日推薦", hours:"營業時間", yourPick:"你的選擇", distance:"距離", favorites:"收藏清單", fav:"收藏",
        history:"歷史紀錄", remove:"移除", emptyFav:"尚未收藏", emptyHist:"尚無紀錄", like:"選這家", nope:"略過",
        openMap:"開地圖", call:"打電話", address:"地址", phone:"電話", website:"官網", nowOpen:"營業中", nowClose:"休息中",
-       reviews:"則評價", price:"價格"},
+       reviews:"則評價", price:"價格",
+       vibeText:{quiet:"安靜", casual:"輕鬆", fast:"快速", group:"適合多人"},
+       cuText:{sushi:"壽司", bento:"便當", noodles:"麵食", thai:"泰式", rice:"丼飯/蓋飯", vegan:"蔬食"}
+  },
   en: {settings:"Settings", language:"Language", skip:"Skip", choose:"Choose", back:"Back", shuffle:"Shuffle",
        hintKeys:"Tip: swipe left/right; or use buttons.", budget:"Budget (TWD)", vibe:"Vibe", cuisines:"Cuisines",
        blind:"Blind Mode (hide names/photos)", noMatches:"No matches. Try widening filters.",
        todaysPick:"Today's Pick", hours:"Hours", yourPick:"Your pick", distance:"Distance", favorites:"Favorites", fav:"Favorite",
        history:"History", remove:"Remove", emptyFav:"No favorites yet", emptyHist:"No history yet", like:"Choose", nope:"Skip",
        openMap:"Open Map", call:"Call", address:"Address", phone:"Phone", website:"Website", nowOpen:"Open now", nowClose:"Closed",
-       reviews:"reviews", price:"Price"}
+       reviews:"reviews", price:"Price",
+       vibeText:{quiet:"Quiet", casual:"Casual", fast:"Fast", group:"Group-friendly"},
+       cuText:{sushi:"Sushi", bento:"Bento", noodles:"Noodles", thai:"Thai", rice:"Rice Bowls", vegan:"Vegan"}
+  }
 };
 let lang = localStorage.getItem("mealr_lang") || (navigator.language && navigator.language.startsWith("zh")? "zh":"en");
 
 // ====== DATA ======
-// 可為店家加上 place_id；沒有的會只顯示本地資料
 const RESTAURANTS = [
   { id:1, name_zh:"鮨青", name_en:"Ao Sushi", cuisine:["sushi"], vibe:["quiet","casual"], price:280, rating:4.5, time:"11:30–14:30", phone:"+886-2-2222-1111", address:"Taipei", place_id:"" , note:{en:"Counter seats, mini omakase", zh:"吧檯座，迷你無菜單"} },
   { id:2, name_zh:"木禾便當", name_en:"Muhe Bento", cuisine:["bento","rice"], vibe:["fast","casual"], price:120, rating:4.2, time:"11:00–20:00", phone:"+886-2-2222-2222", address:"Taipei", place_id:"", note:{en:"Lean options", zh:"清爽選項"} },
@@ -234,25 +243,68 @@ const RESTAURANTS = [
 ];
 
 // ====== STATE ======
-let filters = JSON.parse(localStorage.getItem("mealr_filters") || '{"budget":300,"vibes":[],"cuisines":[],"blind":false}');
+let filters = JSON.parse(localStorage.getItem("mealr_filters") || '{"budget":300,"distance":2000,"vibes":[],"cuisines":[],"blind":false}');
+if(filters.distance==null) filters.distance = 2000;
 filters.vibes = new Set(filters.vibes); filters.cuisines = new Set(filters.cuisines);
 let blindMode = !!filters.blind;
 let pool = []; let index = 0; let current = null;
 let favs = JSON.parse(localStorage.getItem("mealr_favs")||"[]");
 let history = JSON.parse(localStorage.getItem("mealr_hist")||"[]");
 let userPos = null;
+const geoCache = {}; // id -> {lat,lng}
 
+// ====== HELPERS ======
 const $ = s => document.querySelector(s);
 function t(k){ return I18N[lang][k]; }
 function nameOf(r){ return lang==="zh" ? r.name_zh : r.name_en; }
+function saveFilters(){ localStorage.setItem("mealr_filters", JSON.stringify({budget:filters.budget, distance:filters.distance, vibes:[...filters.vibes], cuisines:[...filters.cuisines], blind:blindMode})); }
+function metersToText(m){ if(m<1000) return Math.round(m)+" m"; return (m/1000).toFixed(1)+" km"; }
+function toRad(d){return d*Math.PI/180;}
+function haversine(a,b,c,d){ const R=6371000; const dLat=toRad(c-a), dLon=toRad(d-b); const A=Math.sin(dLat/2)**2 + Math.cos(toRad(a))*Math.cos(toRad(c))*Math.sin(Math.min(1,Math.max(-1,Math.sin(dLon/2)))**2); return 2*R*Math.asin(Math.sqrt(A)); }
 
-// ====== HELPERS ======
-function saveFilters(){ localStorage.setItem("mealr_filters", JSON.stringify({budget:filters.budget, vibes:[...filters.vibes], cuisines:[...filters.cuisines], blind:blindMode})); }
-function applyFilters(){
+function applyFiltersSync(){
   let arr = RESTAURANTS.filter(r => r.price <= (filters.budget || 300));
   if (filters.vibes.size) arr = arr.filter(r => [...filters.vibes].every(v => r.vibe.includes(v)));
   if (filters.cuisines.size) arr = arr.filter(r => r.cuisine.some(c => filters.cuisines.has(c)));
   return arr;
+}
+
+// ====== Google Places ======
+async function fetchPlaceDetails(placeId){
+  if(!USE_PLACES || !placeId) return null;
+  const fields = [
+    "name","rating","user_ratings_total","price_level","formatted_address","international_phone_number","website","url",
+    "opening_hours","photos","geometry","delivery","dine_in","takeout","editorial_summary"
+  ].join(",");
+  const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${encodeURIComponent(placeId)}&fields=${encodeURIComponent(fields)}&language=${lang==="zh"?"zh-TW":"en"}&key=${GOOGLE_API_KEY}`;
+  const res = await fetch(url); if(!res.ok) return null;
+  const data = await res.json(); if(data.status!=="OK") return null;
+  return data.result;
+}
+function photoUrl(ref, max=900){
+  return `https://maps.googleapis.com/maps/api/place/photo?maxwidth=${max}&photo_reference=${encodeURIComponent(ref)}&key=${GOOGLE_API_KEY}`;
+}
+async function fetchGeometry(r){
+  if(!USE_PLACES || !r.place_id || geoCache[r.id]) return;
+  try{
+    const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${encodeURIComponent(r.place_id)}&fields=geometry&key=${GOOGLE_API_KEY}`;
+    const res = await fetch(url); if(!res.ok) return;
+    const data = await res.json(); if(data.status!=="OK") return;
+    const g = data.result.geometry && data.result.geometry.location;
+    if(g) geoCache[r.id] = {lat:g.lat, lng:g.lng};
+  }catch(e){}
+}
+
+// ====== UI TEXT ======
+function updateFilterLabels(){
+  $("#vibeRow").querySelectorAll("button").forEach(btn=>{
+    const key = btn.getAttribute("data-vibe");
+    btn.textContent = I18N[lang].vibeText[key];
+  });
+  $("#cuisineRow").querySelectorAll("button").forEach(btn=>{
+    const key = btn.getAttribute("data-cuisine");
+    btn.textContent = I18N[lang].cuText[key];
+  });
 }
 function renderText(){
   $("#btnSkip").textContent=t("skip"); $("#btnChoose").textContent=t("choose"); $("#btnBack").textContent=t("back"); $("#btnFav").textContent=t("fav");
@@ -262,18 +314,27 @@ function renderText(){
   $("#btnMap").innerHTML = `<span class="action-icon">📍</span>${t("openMap")}`;
   $("#btnCall").innerHTML = `<span class="action-icon">📞</span>${t("call")}`;
   $("#btnWebsite").innerHTML = `<span class="action-icon">🌐</span>${t("website")}`;
+  $("#lblDistance").textContent = lang==="zh" ? "距離（公里）" : "Distance (km)";
+  $("#hintDistance").textContent = lang==="zh" ? "需允許定位與店家有座標；否則不會套用。" : "Requires location + place coordinates.";
+  $("#distanceShow").textContent = "≤ " + (filters.distance/1000).toFixed(1) + " km";
+  updateFilterLabels();
 }
+
+// ====== STACK ======
 function renderStack(){
   const stack=$("#stack"); stack.innerHTML="";
   const topN = pool.slice(index, index+3);
   if(!topN.length){ stack.innerHTML = `<div class="empty">${t("noMatches")}</div>`; return; }
-  const cuMap = lang==="zh"? {sushi:"壽司", bento:"便當", noodles:"麵食", thai:"泰式", rice:"丼飯/蓋飯", vegan:"蔬食"} :
-                             {sushi:"Sushi", bento:"Bento", noodles:"Noodles", thai:"Thai", rice:"Rice", vegan:"Vegan"};
-  const vibeMap = lang==="zh"? {quiet:"安靜", casual:"輕鬆", fast:"快速", group:"適合多人"} :
-                               {quiet:"Quiet", casual:"Casual", fast:"Fast", group:"Group-friendly"};
-  topN.forEach((r,i)=>{
+  const cuMap = I18N[lang].cuText;
+  const vibeMap = I18N[lang].vibeText;
+
+  for(let j = Math.min(2, topN.length-1); j>=0; j--){
+    const r = topN[j];
+    const depth = j;
     const card=document.createElement("div"); card.className="swipe-card";
-    card.style.transform=`translateY(${i*8}px) scale(${1-i*0.02})`; card.style.opacity=1-i*0.05;
+    card.style.transform=`translateY(${depth*8}px) scale(${1-depth*0.02})`; card.style.opacity=1-depth*0.05;
+    card.style.zIndex = String(100 - depth);
+
     const title = blindMode ? t("todaysPick") : nameOf(r);
     const meta = `${blindMode? "—" : "★ " + r.rating.toFixed(1)} • ${blindMode? "—" : r.cuisine.map(c=>cuMap[c]).join(", ")} • <span class="price">≈ ${r.price} TWD</span>`;
     const chips = r.vibe.map(v=>`<span class="chip">${vibeMap[v]}</span>`).join("");
@@ -286,89 +347,29 @@ function renderStack(){
       <div class="row">${chips}</div>
       <div style="color:#ffe7d6;">${note}</div>
       <div class="hint">${hours}</div>`;
-    if(i===0) attachDrag(card);
+    if(j===0) attachDrag(card);
     stack.appendChild(card);
-  });
+  }
 }
 function show(screen){
   if(screen==="swipe"){ $("#swipe").style.display="flex"; $("#result").style.display="none"; renderStack(); }
   else { $("#swipe").style.display="none"; $("#result").style.display="block"; }
 }
+
+// ====== RESULT ======
 function googleMapUrl(r, addr){
   const q = encodeURIComponent(`${nameOf(r)} ${addr || r.address || ""}`.trim());
   return `https://www.google.com/maps/search/?api=1&query=${q}`;
 }
-function priceLevelToDollar(n){
-  if(n==null) return "";
-  return " $" .repeat(Math.max(1, Math.min(4, n)));
-}
-function metersToText(m){
-  if(m==null) return "";
-  if(m<1000) return Math.round(m) + " m";
-  return (m/1000).toFixed(1) + " km";
-}
-function haversine(lat1,lon1,lat2,lon2){
-  function toRad(d){return d*Math.PI/180;}
-  const R=6371000; const dLat=toRad(lat2-lat1); const dLon=toRad(lon2-lon1);
-  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
-  return 2*R*Math.asin(Math.sqrt(a));
-}
-
-// ====== Google Places ======
-async function fetchPlaceDetails(placeId){
-  if(!USE_PLACES || !placeId) return null;
-  const fields = [
-    "name",
-    "rating",
-    "user_ratings_total",
-    "price_level",
-    "formatted_address",
-    "international_phone_number",
-    "website",
-    "url",
-    "opening_hours",
-    "photos",
-    "geometry",
-    "delivery",
-    "dine_in",
-    "takeout",
-    "editorial_summary"
-  ].join(",");
-  // Using Places Details (old REST) for simplicity
-  const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${encodeURIComponent(placeId)}&fields=${encodeURIComponent(fields)}&language=${lang==="zh"?"zh-TW":"en"}&key=${GOOGLE_API_KEY}`;
-  const res = await fetch(url);
-  if(!res.ok) return null;
-  const data = await res.json();
-  if(data.status!=="OK") return null;
-  return data.result;
-}
-function photoUrl(ref, max=800){
-  return `https://maps.googleapis.com/maps/api/place/photo?maxwidth=${max}&photo_reference=${encodeURIComponent(ref)}&key=${GOOGLE_API_KEY}`;
-}
-
-// ====== CORE FLOW ======
-function choose(r){
-  current = r;
-  history.unshift({id:r.id, ts: Date.now()}); history = history.slice(0, 50);
-  localStorage.setItem("mealr_hist", JSON.stringify(history));
-
-  renderBaseResult(r);
-  enrichWithPlaces(r); // async, 取到就更新
-
-  $("#btnMap").onclick = ()=> window.open(googleMapUrl(r), "_blank");
-  $("#btnCall").onclick = ()=>{
-    const tel = r.phone ? `tel:${r.phone.replace(/[^+\\d]/g,'')}` : null;
-    if(tel){ window.location.href = tel; }
-    else { alert(lang==="zh" ? "沒有電話資訊" : "No phone available"); }
-  };
-  $("#btnWebsite").style.display="none";
-  show("result");
+function appendKV(k, v){
+  const el = document.createElement("div");
+  el.className="kv";
+  el.innerHTML = `<strong>${k}</strong><br><small>${v}</small>`;
+  $("#gEnrich").appendChild(el);
 }
 function renderBaseResult(r){
-  const cuMap = lang==="zh"? {sushi:"壽司", bento:"便當", noodles:"麵食", thai:"泰式", rice:"丼飯/蓋飯", vegan:"蔬食"} :
-                             {sushi:"Sushi", bento:"Bento", noodles:"Noodles", thai:"Thai", rice:"Rice", vegan:"Vegan"};
-  const vibeMap = lang==="zh"? {quiet:"安靜", casual:"輕鬆", fast:"快速", group:"適合多人"} :
-                               {quiet:"Quiet", casual:"Casual", fast:"Fast", group:"Group-friendly"};
+  const cuMap = I18N[lang].cuText;
+  const vibeMap = I18N[lang].vibeText;
   const rname = blindMode ? t("yourPick") : nameOf(r);
   const rating = blindMode ? "" : `★ ${r.rating.toFixed(1)} • `;
   const cuisine = r.cuisine.map(c=>cuMap[c]).join(", ");
@@ -387,21 +388,17 @@ async function enrichWithPlaces(r){
     const detail = await fetchPlaceDetails(r.place_id);
     if(!detail) return;
 
-    // 顯示照片
     if(detail.photos && detail.photos.length){
       const ref = detail.photos[0].photo_reference;
       $("#hero").src = photoUrl(ref, 900);
       $("#hero").style.display = "block";
     }
-
-    // 更新 Map / Call / Website
     $("#btnMap").onclick = ()=> window.open(detail.url || googleMapUrl(r, detail.formatted_address), "_blank");
     const tel = detail.international_phone_number || detail.formatted_phone_number;
     if(tel) $("#btnCall").onclick = ()=> window.location.href = `tel:${tel.replace(/[^+\\d]/g,'')}`;
     $("#btnWebsite").style.display = detail.website ? "inline-flex" : "none";
     if(detail.website) $("#btnWebsite").href = detail.website;
 
-    // 距離（有座標 + 取定位）
     if(detail.geometry && detail.geometry.location){
       const lat = detail.geometry.location.lat; const lng = detail.geometry.location.lng;
       if(navigator.geolocation){
@@ -413,38 +410,42 @@ async function enrichWithPlaces(r){
       }
     }
 
-    // 評分 / 人數 / 價位
     if(detail.rating!=null){
       appendKV(`★ ${detail.rating.toFixed(1)}`, `${detail.user_ratings_total || 0} ${t("reviews")}${detail.price_level!=null? " · " + "$".repeat(detail.price_level):""}`);
     }
-    // 營業資訊
     if(detail.opening_hours){
       const openNow = detail.opening_hours.open_now;
       const weekday = detail.opening_hours.weekday_text;
       appendKV(`${t("hours")}`, `${openNow? t("nowOpen"): t("nowClose")}${weekday? `<br><small>${weekday[new Date().getDay()===0?6:new Date().getDay()-1] || ""}</small>`:""}`);
     }
-    // 地址 / 電話
     if(detail.formatted_address){ appendKV(`${t("address")}`, detail.formatted_address); }
     if(tel){ appendKV(`${t("phone")}`, tel); }
-
-    // 服務型態
     const svc = ["dine_in","takeout","delivery"].filter(k=> detail[k]===true);
     if(svc.length){ appendKV("Service", svc.join(" · ")); }
-
-    // 官方總結
     if(detail.editorial_summary && detail.editorial_summary.overview){
       appendKV("Info", detail.editorial_summary.overview);
     }
   }catch(e){ console.warn(e); }
 }
-function appendKV(k, v){
-  const el = document.createElement("div");
-  el.className="kv";
-  el.innerHTML = `<strong>${k}</strong><br><small>${v}</small>`;
-  $("#gEnrich").appendChild(el);
+function choose(r){
+  current = r;
+  history.unshift({id:r.id, ts: Date.now()}); history = history.slice(0, 50);
+  localStorage.setItem("mealr_hist", JSON.stringify(history));
+
+  renderBaseResult(r);
+  enrichWithPlaces(r);
+
+  $("#btnMap").onclick = ()=> window.open(googleMapUrl(r), "_blank");
+  $("#btnCall").onclick = ()=>{
+    const tel = r.phone ? `tel:${r.phone.replace(/[^+\\d]/g,'')}` : null;
+    if(tel){ window.location.href = tel; }
+    else { alert(lang==="zh" ? "沒有電話資訊" : "No phone available"); }
+  };
+  $("#btnWebsite").style.display="none";
+
+  show("result");
 }
 
-// ====== SWIPE ======
 function nextCard(liked){
   const r = pool[index];
   if(!r){ show("result"); return; }
@@ -452,8 +453,8 @@ function nextCard(liked){
   index++; if(index>=pool.length) index=0;
   renderStack();
 }
-function refreshPool(){ pool = applyFilters(); index=0; renderStack(); }
 
+// ====== GESTURE ======
 let startX=0, currentX=0, dragging=false;
 function attachDrag(card){
   const likeBadge = card.querySelector("#badgeLike");
@@ -580,7 +581,11 @@ function syncUIFromState(){
   $("#langSelModal").value = lang;
   $("#budget").value = filters.budget || 300;
   $("#budgetShow").textContent = "≤ " + $("#budget").value;
+  $("#distance").value = filters.distance || 2000;
+  $("#distanceShow").textContent = "≤ " + (filters.distance/1000).toFixed(1) + " km";
   $("#blind").checked = blindMode;
+  updateFilterLabels();
+
   $("#vibeRow").querySelectorAll("button").forEach(b=>{ b.classList.remove("active"); b.style.background="var(--chip)"; b.style.color="var(--fg)"; });
   $("#cuisineRow").querySelectorAll("button").forEach(b=>{ b.classList.remove("active"); b.style.background="var(--chip)"; b.style.color="var(--fg)"; });
   filters.vibes.forEach(v=>{ const b=$("#vibeRow").querySelector(`[data-vibe="${v}"]`); if(b){ b.classList.add("active"); b.style.background="linear-gradient(180deg, var(--primary), var(--primary-2))"; b.style.color="#220b07"; }});
@@ -589,6 +594,10 @@ function syncUIFromState(){
 }
 
 $("#budget").addEventListener("input", e=> $("#budgetShow").textContent = "≤ " + e.target.value );
+$("#distance").addEventListener("input", e=>{
+  filters.distance = +e.target.value;
+  $("#distanceShow").textContent = "≤ " + (filters.distance/1000).toFixed(1) + " km";
+});
 $("#vibeRow").addEventListener("click", e=>{
   const btn = e.target.closest("button[data-vibe]"); if(!btn || blindMode) return;
   const k = btn.dataset.vibe;
@@ -603,10 +612,27 @@ $("#cuisineRow").addEventListener("click", e=>{
 });
 $("#blind").addEventListener("change", e=>{ blindMode = e.target.checked; $("#filtersBlock").classList.toggle("disabled", blindMode); });
 
-$("#applySettings").addEventListener("click", ()=>{
-  filters.budget = +$("#budget").value; lang = $("#langSelModal").value;
+// Apply settings
+$("#applySettings").addEventListener("click", async ()=>{
+  filters.budget = +$("#budget").value; 
+  saveFilters(); 
+  await refreshPool(); 
+  if(current) choose(current); 
+  closeModal();
+});
+
+// Instant language switch
+const langSel = document.getElementById("langSelModal");
+langSel.addEventListener("change", ()=>{
+  lang = langSel.value;
   localStorage.setItem("mealr_lang", lang);
-  saveFilters(); renderText(); refreshPool(); if(current) choose(current); closeModal();
+  renderText();
+  renderStack();
+  // refresh result card if open
+  if(current){ renderBaseResult(current); enrichWithPlaces(current); }
+  // also refresh list/popups if open
+  if(document.getElementById("favModal").classList.contains("active")) renderFavs();
+  if(document.getElementById("histModal").classList.contains("active")) renderHistory();
 });
 
 // ====== MODALS ======
@@ -630,13 +656,35 @@ $("#btnChoose").addEventListener("click", ()=> nextCard(true));
 $("#btnBack").addEventListener("click", ()=> show("swipe"));
 $("#btnFav").addEventListener("click", ()=>{ if(current) addFav(current); openFav(); });
 
+// ====== DISTANCE FILTER (build pool) ======
+async function refreshPool(){
+  let arr = applyFiltersSync();
+  const needDistance = filters.distance < 2000;
+  const canFilterByDistance = needDistance && userPos && USE_PLACES;
+  if(canFilterByDistance){
+    await Promise.all(arr.map(r=>fetchGeometry(r)));
+    arr = arr.filter(r=>{
+      const g = geoCache[r.id];
+      if(!g) return true;
+      const d = haversine(userPos.lat, userPos.lng, g.lat, g.lng);
+      return d <= filters.distance;
+    });
+  }
+  pool = arr; index=0; renderStack();
+}
+
 // ====== INIT ======
-document.addEventListener("DOMContentLoaded", ()=>{
-  renderText(); refreshPool();
+document.addEventListener("DOMContentLoaded", async ()=>{
+  renderText();
   if(navigator.geolocation){
-    navigator.geolocation.getCurrentPosition(pos => userPos = {lat:pos.coords.latitude, lng:pos.coords.longitude}, ()=>{});
+    navigator.geolocation.getCurrentPosition(pos => { userPos = {lat:pos.coords.latitude, lng:pos.coords.longitude}; refreshPool(); }, ()=> refreshPool());
+  }else{
+    refreshPool();
   }
 });
 </script>
 </body>
 </html>
+"""
+open("/mnt/data/mealr_v16_full.html","w",encoding="utf-8").write(html)
+"/mnt/data/mealr_v16_full.html"
