@@ -1,10 +1,9 @@
-
 <!DOCTYPE html>
 <html lang="zh">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-<title>Mealr v11 (Mobile)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum=1, user-scalable=no" />
+<title>Mealr v13 (Mobile + Google Places)</title>
 <style>
   :root {
     --bg:#1b0f0a; --fg:#fff6f0; --muted:#ffddc9;
@@ -16,12 +15,10 @@
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color: rgba(0,0,0,0);}
   html,body{height:100%; margin:0; background:#000;}
-  .phone {
-    width: 390px; height: 100vh; max-height: 844px; margin: 0 auto;
+  .phone { width: 390px; height: 100vh; max-height: 844px; margin: 0 auto;
     background: radial-gradient(900px 600px at 15% -10%, #3a2118, #1b0f0a), linear-gradient(180deg, #2a1710, #1b0f0a);
     color: var(--fg); font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "Helvetica Neue", Arial;
-    display:flex; flex-direction:column; overflow:hidden; border-left:1px solid rgba(255,255,255,.06); border-right:1px solid rgba(255,255,255,.06);
-  }
+    display:flex; flex-direction:column; overflow:hidden; border-left:1px solid rgba(255,255,255,.06); border-right:1px solid rgba(255,255,255,.06);}
   header{flex:0 0 auto; display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px 12px;
     background:linear-gradient(180deg, rgba(27,15,10,.95), rgba(27,15,10,.75)); position:sticky; top:0; z-index:10; backdrop-filter: blur(6px);}
   header h1{margin:0; font-size:clamp(16px, 2.8vw, 18px); display:flex; align-items:center; gap:8px;}
@@ -78,10 +75,18 @@
   #result{display:none; flex:1 1 auto; padding:12px; overflow:auto;}
   .card{background:var(--card); border:1px solid rgba(255,255,255,.12); border-radius:16px; padding:16px; box-shadow:0 14px 40px rgba(0,0,0,.55);
     animation: fadeIn .25s ease;}
-  .result-controls{display:flex; gap:10px; margin-top:12px;}
-
+  .hero{width:100%; height:170px; border-radius:12px; object-fit:cover; margin-bottom:10px; border:1px solid rgba(255,255,255,.12); display:none;}
+  .result-controls{display:flex; gap:10px; margin-top:12px; flex-wrap:wrap;}
+  .result-actions{display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;}
   .list-item{display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px dashed rgba(255,255,255,.12);}
   .list-meta{font-size:12px; color:var(--muted);}
+
+  .action-btn{flex:1; display:inline-flex; align-items:center; justify-content:center; gap:8px;
+    background:var(--btn); border:1px solid rgba(255,255,255,.18); color:var(--fg); padding:10px 14px; border-radius:12px; font-weight:700; cursor:pointer;}
+  .action-btn.primary{background:linear-gradient(180deg,var(--primary),var(--primary-2)); color:#220b07; border:none; box-shadow:0 6px 20px rgba(255,90,95,.18);}
+  .action-icon{font-size:16px;}
+  .kv{margin-top:8px; color:#ffe7d6; font-size:14px;}
+  .kv small{color:var(--muted); font-size:12px; display:block; margin-top:2px;}
 
   @keyframes fadeIn{from{opacity:0; transform:translateY(8px);} to{opacity:1; transform:translateY(0);}}
 </style>
@@ -107,14 +112,24 @@
     </main>
 
     <section id="result">
-      <div id="resultCard" class="card"></div>
+      <div id="resultCard" class="card">
+        <img id="hero" class="hero" alt="photo"/>
+        <div id="resultBody"></div>
+        <div id="gEnrich" class="kv"></div>
+      </div>
       <div class="result-controls">
         <button id="btnBack" class="btn">返回</button>
         <button id="btnFav" class="btn primary">收藏</button>
       </div>
+      <div class="result-actions">
+        <button id="btnMap" class="action-btn"><span class="action-icon">📍</span>開地圖</button>
+        <button id="btnCall" class="action-btn"><span class="action-icon">📞</span>打電話</button>
+        <a id="btnWebsite" class="action-btn" target="_blank" rel="noopener" style="text-decoration:none;"><span class="action-icon">🌐</span>官網</a>
+      </div>
     </section>
   </div>
 
+  <!-- 設定 -->
   <div id="overlay" class="overlay"></div>
   <div id="modal" class="modal" role="dialog" aria-modal="true">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
@@ -159,6 +174,7 @@
     </div>
   </div>
 
+  <!-- 收藏 -->
   <div id="favOverlay" class="overlay"></div>
   <div id="favModal" class="modal" role="dialog" aria-modal="true">
     <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -168,6 +184,7 @@
     <div id="favList" style="margin-top:6px;"></div>
   </div>
 
+  <!-- 歷史 -->
   <div id="histOverlay" class="overlay"></div>
   <div id="histModal" class="modal" role="dialog" aria-modal="true">
     <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -178,43 +195,58 @@
   </div>
 
 <script>
+// ====== CONFIG ======
+const GOOGLE_API_KEY = ""; // ← 放你的 Google Maps/Places API Key
+const USE_PLACES = !!GOOGLE_API_KEY;
+
+// ====== I18N ======
 const I18N = {
   zh: {settings:"設定", language:"語言", skip:"略過", choose:"選這家", back:"返回", shuffle:"重新洗牌",
        hintKeys:"提示：可以左右滑動卡片；也可用按鈕操作。", budget:"預算（TWD）", vibe:"氛圍", cuisines:"料理類型",
        blind:"盲選模式（隱藏名稱與照片，避免偏見）", noMatches:"沒有符合條件的店家，試著放寬條件。",
        todaysPick:"今日推薦", hours:"營業時間", yourPick:"你的選擇", distance:"距離", favorites:"收藏清單", fav:"收藏",
-       history:"歷史紀錄", remove:"移除", emptyFav:"尚未收藏", emptyHist:"尚無紀錄", like:"選這家", nope:"略過"},
+       history:"歷史紀錄", remove:"移除", emptyFav:"尚未收藏", emptyHist:"尚無紀錄", like:"選這家", nope:"略過",
+       openMap:"開地圖", call:"打電話", address:"地址", phone:"電話", website:"官網", nowOpen:"營業中", nowClose:"休息中",
+       reviews:"則評價", price:"價格"},
   en: {settings:"Settings", language:"Language", skip:"Skip", choose:"Choose", back:"Back", shuffle:"Shuffle",
        hintKeys:"Tip: swipe left/right; or use buttons.", budget:"Budget (TWD)", vibe:"Vibe", cuisines:"Cuisines",
        blind:"Blind Mode (hide names/photos)", noMatches:"No matches. Try widening filters.",
        todaysPick:"Today's Pick", hours:"Hours", yourPick:"Your pick", distance:"Distance", favorites:"Favorites", fav:"Favorite",
-       history:"History", remove:"Remove", emptyFav:"No favorites yet", emptyHist:"No history yet", like:"Choose", nope:"Skip"}
+       history:"History", remove:"Remove", emptyFav:"No favorites yet", emptyHist:"No history yet", like:"Choose", nope:"Skip",
+       openMap:"Open Map", call:"Call", address:"Address", phone:"Phone", website:"Website", nowOpen:"Open now", nowClose:"Closed",
+       reviews:"reviews", price:"Price"}
 };
 let lang = localStorage.getItem("mealr_lang") || (navigator.language && navigator.language.startsWith("zh")? "zh":"en");
 
+// ====== DATA ======
+// 可為店家加上 place_id；沒有的會只顯示本地資料
 const RESTAURANTS = [
-  { id:1, name_zh:"鮨青", name_en:"Ao Sushi", cuisine:["sushi"], vibe:["quiet","casual"], price:280, rating:4.5, time:"11:30–14:30", note:{en:"Counter seats, mini omakase", zh:"吧檯座，迷你無菜單"} },
-  { id:2, name_zh:"木禾便當", name_en:"Muhe Bento", cuisine:["bento","rice"], vibe:["fast","casual"], price:120, rating:4.2, time:"11:00–20:00", note:{en:"Lean options", zh:"清爽選項"} },
-  { id:3, name_zh:"小山壽司", name_en:"Koyama Sushi", cuisine:["sushi"], vibe:["quiet"], price:320, rating:4.3, time:"11:30–14:00", note:{en:"Calm vibe, soft music", zh:"安靜氛圍，輕音樂"} },
-  { id:4, name_zh:"清湯拉麵", name_en:"Light Broth Ramen", cuisine:["noodles"], vibe:["fast"], price:180, rating:4.0, time:"11:00–21:00", note:{en:"Light broth", zh:"清爽湯頭"} },
-  { id:5, name_zh:"泰泰", name_en:"ThaiThai", cuisine:["thai"], vibe:["group","casual"], price:260, rating:4.4, time:"11:00–15:00", note:{en:"Great for sharing", zh:"適合分食"} },
-  { id:6, name_zh:"米食堂", name_en:"Rice House", cuisine:["rice","vegan"], vibe:["quiet"], price:200, rating:4.1, time:"11:00–14:00", note:{en:"Plant-forward bowls", zh:"植物系碗餐"} },
-  { id:7, name_zh:"商午便當", name_en:"Office Lunch Bento", cuisine:["bento"], vibe:["fast","casual"], price:130, rating:3.9, time:"11:00–14:00", note:{en:"Quick & cheap", zh:"快速實惠"} },
-  { id:8, name_zh:"炭烤丼", name_en:"Charcoal Don", cuisine:["rice"], vibe:["casual","group"], price:240, rating:4.2, time:"11:30–14:30", note:{en:"Charcoal grill", zh:"炭烤香氣"} },
-  { id:9, name_zh:"靜謐壽司", name_en:"Serene Sushi", cuisine:["sushi"], vibe:["quiet"], price:290, rating:4.6, time:"12:00–14:30", note:{en:"Low-noise policy", zh:"低噪音規則"} },
-  { id:10, name_zh:"蔬食麵所", name_en:"Veggie Noodle", cuisine:["vegan","noodles"], vibe:["quiet","casual"], price:190, rating:4.0, time:"11:00–14:30", note:{en:"No garlic/onion options", zh:"可選五辛素"} }
+  { id:1, name_zh:"鮨青", name_en:"Ao Sushi", cuisine:["sushi"], vibe:["quiet","casual"], price:280, rating:4.5, time:"11:30–14:30", phone:"+886-2-2222-1111", address:"Taipei", place_id:"" , note:{en:"Counter seats, mini omakase", zh:"吧檯座，迷你無菜單"} },
+  { id:2, name_zh:"木禾便當", name_en:"Muhe Bento", cuisine:["bento","rice"], vibe:["fast","casual"], price:120, rating:4.2, time:"11:00–20:00", phone:"+886-2-2222-2222", address:"Taipei", place_id:"", note:{en:"Lean options", zh:"清爽選項"} },
+  { id:3, name_zh:"小山壽司", name_en:"Koyama Sushi", cuisine:["sushi"], vibe:["quiet"], price:320, rating:4.3, time:"11:30–14:00", phone:"+886-2-3333-3333", address:"Taipei", place_id:"", note:{en:"Calm vibe, soft music", zh:"安靜氛圍，輕音樂"} },
+  { id:4, name_zh:"清湯拉麵", name_en:"Light Broth Ramen", cuisine:["noodles"], vibe:["fast"], price:180, rating:4.0, time:"11:00–21:00", phone:"+886-2-4444-4444", address:"Taipei", place_id:"", note:{en:"Light broth", zh:"清爽湯頭"} },
+  { id:5, name_zh:"泰泰", name_en:"ThaiThai", cuisine:["thai"], vibe:["group","casual"], price:260, rating:4.4, time:"11:00–15:00", phone:"+886-2-5555-5555", address:"Taipei", place_id:"", note:{en:"Great for sharing", zh:"適合分食"} },
+  { id:6, name_zh:"米食堂", name_en:"Rice House", cuisine:["rice","vegan"], vibe:["quiet"], price:200, rating:4.1, time:"11:00–14:00", phone:"+886-2-6666-6666", address:"Taipei", place_id:"", note:{en:"Plant-forward bowls", zh:"植物系碗餐"} },
+  { id:7, name_zh:"商午便當", name_en:"Office Lunch Bento", cuisine:["bento"], vibe:["fast","casual"], price:130, rating:3.9, time:"11:00–14:00", phone:"+886-2-7777-7777", address:"Taipei", place_id:"", note:{en:"Quick & cheap", zh:"快速實惠"} },
+  { id:8, name_zh:"炭烤丼", name_en:"Charcoal Don", cuisine:["rice"], vibe:["casual","group"], price:240, rating:4.2, time:"11:30–14:30", phone:"+886-2-8888-8888", address:"Taipei", place_id:"", note:{en:"Charcoal grill", zh:"炭烤香氣"} },
+  { id:9, name_zh:"靜謐壽司", name_en:"Serene Sushi", cuisine:["sushi"], vibe:["quiet"], price:290, rating:4.6, time:"12:00–14:30", phone:"+886-2-9999-9999", address:"Taipei", place_id:"", note:{en:"Low-noise policy", zh:"低噪音規則"} },
+  { id:10, name_zh:"蔬食麵所", name_en:"Veggie Noodle", cuisine:["vegan","noodles"], vibe:["quiet","casual"], price:190, rating:4.0, time:"11:00–14:30", phone:"+886-2-1010-1010", address:"Taipei", place_id:"", note:{en:"No garlic/onion options", zh:"可選五辛素"} }
 ];
 
+// ====== STATE ======
 let filters = JSON.parse(localStorage.getItem("mealr_filters") || '{"budget":300,"vibes":[],"cuisines":[],"blind":false}');
 filters.vibes = new Set(filters.vibes); filters.cuisines = new Set(filters.cuisines);
 let blindMode = !!filters.blind;
 let pool = []; let index = 0; let current = null;
 let favs = JSON.parse(localStorage.getItem("mealr_favs")||"[]");
 let history = JSON.parse(localStorage.getItem("mealr_hist")||"[]");
+let userPos = null;
 
 const $ = s => document.querySelector(s);
 function t(k){ return I18N[lang][k]; }
 function nameOf(r){ return lang==="zh" ? r.name_zh : r.name_en; }
+
+// ====== HELPERS ======
 function saveFilters(){ localStorage.setItem("mealr_filters", JSON.stringify({budget:filters.budget, vibes:[...filters.vibes], cuisines:[...filters.cuisines], blind:blindMode})); }
 function applyFilters(){
   let arr = RESTAURANTS.filter(r => r.price <= (filters.budget || 300));
@@ -227,6 +259,9 @@ function renderText(){
   $("#hintKeys").textContent=t("hintKeys"); $("#mTitle").textContent=t("settings"); $("#lblLang").textContent=t("language");
   $("#lblBudget").textContent=t("budget"); $("#lblVibe").textContent=t("vibe"); $("#lblCuisine").textContent=t("cuisines"); $("#lblBlind").textContent=t("blind");
   $("#favTitle").textContent=t("favorites"); $("#histTitle").textContent=t("history");
+  $("#btnMap").innerHTML = `<span class="action-icon">📍</span>${t("openMap")}`;
+  $("#btnCall").innerHTML = `<span class="action-icon">📞</span>${t("call")}`;
+  $("#btnWebsite").innerHTML = `<span class="action-icon">🌐</span>${t("website")}`;
 }
 function renderStack(){
   const stack=$("#stack"); stack.innerHTML="";
@@ -259,11 +294,77 @@ function show(screen){
   if(screen==="swipe"){ $("#swipe").style.display="flex"; $("#result").style.display="none"; renderStack(); }
   else { $("#swipe").style.display="none"; $("#result").style.display="block"; }
 }
+function googleMapUrl(r, addr){
+  const q = encodeURIComponent(`${nameOf(r)} ${addr || r.address || ""}`.trim());
+  return `https://www.google.com/maps/search/?api=1&query=${q}`;
+}
+function priceLevelToDollar(n){
+  if(n==null) return "";
+  return " $" .repeat(Math.max(1, Math.min(4, n)));
+}
+function metersToText(m){
+  if(m==null) return "";
+  if(m<1000) return Math.round(m) + " m";
+  return (m/1000).toFixed(1) + " km";
+}
+function haversine(lat1,lon1,lat2,lon2){
+  function toRad(d){return d*Math.PI/180;}
+  const R=6371000; const dLat=toRad(lat2-lat1); const dLon=toRad(lon2-lon1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+  return 2*R*Math.asin(Math.sqrt(a));
+}
+
+// ====== Google Places ======
+async function fetchPlaceDetails(placeId){
+  if(!USE_PLACES || !placeId) return null;
+  const fields = [
+    "name",
+    "rating",
+    "user_ratings_total",
+    "price_level",
+    "formatted_address",
+    "international_phone_number",
+    "website",
+    "url",
+    "opening_hours",
+    "photos",
+    "geometry",
+    "delivery",
+    "dine_in",
+    "takeout",
+    "editorial_summary"
+  ].join(",");
+  // Using Places Details (old REST) for simplicity
+  const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${encodeURIComponent(placeId)}&fields=${encodeURIComponent(fields)}&language=${lang==="zh"?"zh-TW":"en"}&key=${GOOGLE_API_KEY}`;
+  const res = await fetch(url);
+  if(!res.ok) return null;
+  const data = await res.json();
+  if(data.status!=="OK") return null;
+  return data.result;
+}
+function photoUrl(ref, max=800){
+  return `https://maps.googleapis.com/maps/api/place/photo?maxwidth=${max}&photo_reference=${encodeURIComponent(ref)}&key=${GOOGLE_API_KEY}`;
+}
+
+// ====== CORE FLOW ======
 function choose(r){
   current = r;
   history.unshift({id:r.id, ts: Date.now()}); history = history.slice(0, 50);
   localStorage.setItem("mealr_hist", JSON.stringify(history));
 
+  renderBaseResult(r);
+  enrichWithPlaces(r); // async, 取到就更新
+
+  $("#btnMap").onclick = ()=> window.open(googleMapUrl(r), "_blank");
+  $("#btnCall").onclick = ()=>{
+    const tel = r.phone ? `tel:${r.phone.replace(/[^+\\d]/g,'')}` : null;
+    if(tel){ window.location.href = tel; }
+    else { alert(lang==="zh" ? "沒有電話資訊" : "No phone available"); }
+  };
+  $("#btnWebsite").style.display="none";
+  show("result");
+}
+function renderBaseResult(r){
   const cuMap = lang==="zh"? {sushi:"壽司", bento:"便當", noodles:"麵食", thai:"泰式", rice:"丼飯/蓋飯", vegan:"蔬食"} :
                              {sushi:"Sushi", bento:"Bento", noodles:"Noodles", thai:"Thai", rice:"Rice", vegan:"Vegan"};
   const vibeMap = lang==="zh"? {quiet:"安靜", casual:"輕鬆", fast:"快速", group:"適合多人"} :
@@ -273,12 +374,77 @@ function choose(r){
   const cuisine = r.cuisine.map(c=>cuMap[c]).join(", ");
   const price = `≈ ${r.price} TWD`;
   const note = blindMode ? (lang==="zh"?"盲選模式：到店揭曉！":"Blind Mode: reveal by visiting!") : r.note[lang];
-  $("#resultCard").innerHTML = `<div class="title">${rname}</div>
+  $("#hero").style.display="none"; $("#hero").src="";
+  $("#resultBody").innerHTML = `<div class="title">${rname}</div>
     <div class="meta" style="margin:6px 0 10px;">${rating}${cuisine} • <span class="price">${price}</span></div>
     <div class="row">${r.vibe.map(v=>`<span class="chip">${vibeMap[v]}</span>`).join("")}</div>
     <div style="margin-top:10px; color:#ffe7d6;">${note}</div>`;
-  show("result");
+  $("#gEnrich").innerHTML = "";
 }
+async function enrichWithPlaces(r){
+  if(!r.place_id || !USE_PLACES || blindMode) return;
+  try{
+    const detail = await fetchPlaceDetails(r.place_id);
+    if(!detail) return;
+
+    // 顯示照片
+    if(detail.photos && detail.photos.length){
+      const ref = detail.photos[0].photo_reference;
+      $("#hero").src = photoUrl(ref, 900);
+      $("#hero").style.display = "block";
+    }
+
+    // 更新 Map / Call / Website
+    $("#btnMap").onclick = ()=> window.open(detail.url || googleMapUrl(r, detail.formatted_address), "_blank");
+    const tel = detail.international_phone_number || detail.formatted_phone_number;
+    if(tel) $("#btnCall").onclick = ()=> window.location.href = `tel:${tel.replace(/[^+\\d]/g,'')}`;
+    $("#btnWebsite").style.display = detail.website ? "inline-flex" : "none";
+    if(detail.website) $("#btnWebsite").href = detail.website;
+
+    // 距離（有座標 + 取定位）
+    if(detail.geometry && detail.geometry.location){
+      const lat = detail.geometry.location.lat; const lng = detail.geometry.location.lng;
+      if(navigator.geolocation){
+        navigator.geolocation.getCurrentPosition(pos=>{
+          userPos = {lat: pos.coords.latitude, lng: pos.coords.longitude};
+          const dist = haversine(userPos.lat, userPos.lng, lat, lng);
+          appendKV(`${t("distance")}`, metersToText(dist));
+        }, ()=>{});
+      }
+    }
+
+    // 評分 / 人數 / 價位
+    if(detail.rating!=null){
+      appendKV(`★ ${detail.rating.toFixed(1)}`, `${detail.user_ratings_total || 0} ${t("reviews")}${detail.price_level!=null? " · " + "$".repeat(detail.price_level):""}`);
+    }
+    // 營業資訊
+    if(detail.opening_hours){
+      const openNow = detail.opening_hours.open_now;
+      const weekday = detail.opening_hours.weekday_text;
+      appendKV(`${t("hours")}`, `${openNow? t("nowOpen"): t("nowClose")}${weekday? `<br><small>${weekday[new Date().getDay()===0?6:new Date().getDay()-1] || ""}</small>`:""}`);
+    }
+    // 地址 / 電話
+    if(detail.formatted_address){ appendKV(`${t("address")}`, detail.formatted_address); }
+    if(tel){ appendKV(`${t("phone")}`, tel); }
+
+    // 服務型態
+    const svc = ["dine_in","takeout","delivery"].filter(k=> detail[k]===true);
+    if(svc.length){ appendKV("Service", svc.join(" · ")); }
+
+    // 官方總結
+    if(detail.editorial_summary && detail.editorial_summary.overview){
+      appendKV("Info", detail.editorial_summary.overview);
+    }
+  }catch(e){ console.warn(e); }
+}
+function appendKV(k, v){
+  const el = document.createElement("div");
+  el.className="kv";
+  el.innerHTML = `<strong>${k}</strong><br><small>${v}</small>`;
+  $("#gEnrich").appendChild(el);
+}
+
+// ====== SWIPE ======
 function nextCard(liked){
   const r = pool[index];
   if(!r){ show("result"); return; }
@@ -322,20 +488,41 @@ function attachDrag(card){
   window.onmouseup = onEnd;
 }
 
+// ====== FAV/HISTORY ======
 function renderFavs(){
   const list = $("#favList"); list.innerHTML="";
   if(!favs.length){ list.innerHTML = `<div class="empty">${t("emptyFav")}</div>`; return; }
   favs.forEach(id=>{
     const r = RESTAURANTS.find(x=>x.id===id); if(!r) return;
-    const row = document.createElement("div"); row.className="list-item";
-    row.innerHTML = `<div>${nameOf(r)} · <span class="price">≈ ${r.price} TWD</span></div>
-      <button data-id="${id}" class="iconbtn">${t("remove")}</button>`;
-    row.querySelector("button").onclick = (e)=>{
-      const rid = +e.target.getAttribute("data-id");
+
+    const row = document.createElement("div");
+    row.className = "list-item";
+    row.setAttribute("role", "button");
+    row.tabIndex = 0;
+    row.style.cursor = "pointer";
+
+    const left = document.createElement("div");
+    left.innerHTML = `${nameOf(r)} · <span class="price">≈ ${r.price} TWD</span>`;
+
+    const btn = document.createElement("button");
+    btn.className = "iconbtn";
+    btn.textContent = t("remove");
+    btn.setAttribute("data-id", String(id));
+
+    const openDetail = ()=>{ choose(r); closeFav(); };
+    row.onclick = openDetail;
+    row.onkeydown = (e)=>{ if(e.key === "Enter" || e.key === " ") { e.preventDefault(); openDetail(); } };
+
+    btn.onclick = (e)=>{
+      e.stopPropagation();
+      const rid = +e.currentTarget.getAttribute("data-id");
       favs = favs.filter(x=>x!==rid);
       localStorage.setItem("mealr_favs", JSON.stringify(favs));
       renderFavs();
     };
+
+    row.appendChild(left);
+    row.appendChild(btn);
     list.appendChild(row);
   });
 }
@@ -346,21 +533,42 @@ function renderHistory(){
   if(!history.length){ list.innerHTML = `<div class="empty">${t("emptyHist")}</div>`; return; }
   history.forEach(item=>{
     const r = RESTAURANTS.find(x=>x.id===item.id); if(!r) return;
-    const row = document.createElement("div"); row.className="list-item";
+
+    const row = document.createElement("div");
+    row.className="list-item";
+    row.setAttribute("role","button");
+    row.tabIndex = 0;
+    row.style.cursor = "pointer";
+
     const timeStr = new Date(item.ts).toLocaleString(lang==="zh"?"zh-TW":"en-US");
-    row.innerHTML = `<div><div>${nameOf(r)} · <span class="price">≈ ${r.price} TWD</span></div><div class="list-meta">${timeStr}</div></div>
-      <button data-ts="${item.ts}" class="iconbtn">${t("remove")}</button>`;
-    row.querySelector("button").onclick = (e)=>{
-      const ts = +e.target.getAttribute("data-ts");
+
+    const left = document.createElement("div");
+    left.innerHTML = `<div>${nameOf(r)} · <span class="price">≈ ${r.price} TWD</span></div><div class="list-meta">${timeStr}</div>`;
+
+    const btn = document.createElement("button");
+    btn.className = "iconbtn";
+    btn.textContent = t("remove");
+    btn.setAttribute("data-ts", String(item.ts));
+
+    const openDetail = ()=>{ choose(r); closeHist(); };
+    row.onclick = openDetail;
+    row.onkeydown = (e)=>{ if(e.key==="Enter" || e.key===" "){ e.preventDefault(); openDetail(); } };
+
+    btn.onclick = (e)=>{
+      e.stopPropagation();
+      const ts = +e.currentTarget.getAttribute("data-ts");
       history = history.filter(x=>x.ts!==ts);
       localStorage.setItem("mealr_hist", JSON.stringify(history));
       renderHistory();
     };
+
+    row.appendChild(left);
+    row.appendChild(btn);
     list.appendChild(row);
   });
 }
 
-// Settings modal wiring
+// ====== SETTINGS ======
 const overlay = $("#overlay"), modal = $("#modal");
 function openModal(){ overlay.classList.add("active"); modal.classList.add("active"); syncUIFromState(); }
 function closeModal(){ overlay.classList.remove("active"); modal.classList.remove("active"); }
@@ -401,7 +609,7 @@ $("#applySettings").addEventListener("click", ()=>{
   saveFilters(); renderText(); refreshPool(); if(current) choose(current); closeModal();
 });
 
-// Favorites & History modals
+// ====== MODALS ======
 const favOverlay=$("#favOverlay"), favModal=$("#favModal");
 function openFav(){ favOverlay.classList.add("active"); favModal.classList.add("active"); renderFavs(); }
 function closeFav(){ favOverlay.classList.remove("active"); favModal.classList.remove("active"); }
@@ -416,13 +624,19 @@ $("#btnHistory").addEventListener("click", openHist);
 $("#histClose").addEventListener("click", closeHist);
 histOverlay.addEventListener("click", closeHist);
 
-// Buttons
+// ====== MAIN BTN ======
 $("#btnSkip").addEventListener("click", ()=> nextCard(false));
 $("#btnChoose").addEventListener("click", ()=> nextCard(true));
 $("#btnBack").addEventListener("click", ()=> show("swipe"));
 $("#btnFav").addEventListener("click", ()=>{ if(current) addFav(current); openFav(); });
 
-document.addEventListener("DOMContentLoaded", ()=>{ renderText(); refreshPool(); });
+// ====== INIT ======
+document.addEventListener("DOMContentLoaded", ()=>{
+  renderText(); refreshPool();
+  if(navigator.geolocation){
+    navigator.geolocation.getCurrentPosition(pos => userPos = {lat:pos.coords.latitude, lng:pos.coords.longitude}, ()=>{});
+  }
+});
 </script>
 </body>
 </html>
