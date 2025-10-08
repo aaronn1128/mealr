@@ -1,0 +1,428 @@
+
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Mealr v11 (Mobile)</title>
+<style>
+  :root {
+    --bg:#1b0f0a; --fg:#fff6f0; --muted:#ffddc9;
+    --primary:#ff8a3d; --primary-2:#ff5a5f;
+    --card:#2b1912; --btn:#3a2219; --chip:#41251a;
+    --disabled:#3a2a24; --disabled-text:#c8a99a;
+    --select-bg:#2b1c14; --select-text:#f5e0c5; --select-border:#5a4638;
+    --like:#6ee7a8; --nope:#fca5a5;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color: rgba(0,0,0,0);}
+  html,body{height:100%; margin:0; background:#000;}
+  .phone {
+    width: 390px; height: 100vh; max-height: 844px; margin: 0 auto;
+    background: radial-gradient(900px 600px at 15% -10%, #3a2118, #1b0f0a), linear-gradient(180deg, #2a1710, #1b0f0a);
+    color: var(--fg); font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "Helvetica Neue", Arial;
+    display:flex; flex-direction:column; overflow:hidden; border-left:1px solid rgba(255,255,255,.06); border-right:1px solid rgba(255,255,255,.06);
+  }
+  header{flex:0 0 auto; display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px 12px;
+    background:linear-gradient(180deg, rgba(27,15,10,.95), rgba(27,15,10,.75)); position:sticky; top:0; z-index:10; backdrop-filter: blur(6px);}
+  header h1{margin:0; font-size:clamp(16px, 2.8vw, 18px); display:flex; align-items:center; gap:8px;}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--primary);box-shadow:0 0 12px var(--primary-2),0 0 24px rgba(255,90,95,.4);display:inline-block;}
+  .right{display:flex; align-items:center; gap:6px;}
+  .iconbtn{border:1px solid rgba(255,255,255,.22); background:#3a2219; color:#ffe7d6; padding:8px 10px; border-radius:10px; cursor:pointer;}
+  main{flex:1 1 auto; display:flex; flex-direction:column; overflow:hidden;}
+  .stack{position:relative; flex:1 1 auto; margin:12px; border-radius:16px;}
+  .swipe-card{position:absolute; inset:0; background:var(--card); border:1px solid rgba(255,255,255,.12); border-radius:16px; padding:16px;
+    box-shadow:0 14px 40px rgba(0,0,0,.55); display:flex; flex-direction:column; gap:8px; touch-action:none;
+    transition: transform .25s ease, opacity .25s ease;}
+  .title{font-size:clamp(18px, 3.5vw, 22px); font-weight:800;}
+  .meta{color:var(--muted); font-size:clamp(12px, 2.6vw, 13px); display:flex; gap:10px; align-items:center;}
+  .price{font-weight:800; color:#ffd29b;}
+  .row{display:flex; gap:8px; flex-wrap:wrap;}
+  .chip{font-size:12px; color:#ffd9c6; background:#3a2118; padding:6px 9px; border-radius:999px; border:1px solid rgba(255,255,255,.14);}
+  .controls{display:flex; gap:10px; padding:0 12px 12px;}
+  .btn{flex:1; cursor:pointer; background:var(--btn); border:1px solid rgba(255,255,255,.18); padding:clamp(10px,3.4vw,14px) 14px; border-radius:14px; color:var(--fg); font-weight:700;}
+  .btn.primary{background:linear-gradient(180deg,var(--primary),var(--primary-2)); color:#ffe7d6; border:none; box-shadow:0 6px 20px rgba(255,90,95,.18);}
+  .hint{color:var(--muted); font-size:12px; text-align:center; padding:4px 0 10px;}
+  .empty{color:var(--muted); text-align:center; margin-top:60px; padding:0 16px;}
+
+  .badge{position:absolute; top:14px; padding:6px 10px; border:3px solid; border-radius:10px; font-weight:900; letter-spacing:.08em;
+    transform:rotate(-15deg); opacity:0; transition:opacity .15s;}
+  .badge.like{left:14px; color:#063; border-color:var(--like); background:rgba(110,231,168,.12);}
+  .badge.nope{right:14px; color:#6b0000; border-color:var(--nope); background:rgba(252,165,165,.12); transform:rotate(15deg);}
+
+  .overlay{position:fixed; inset:0; background:rgba(0,0,0,.45); display:none; z-index:20; opacity:0; transition:opacity .25s ease;}
+  .overlay.active{display:block; opacity:1;}
+  .modal{position:fixed; left:50%; transform:translate(-50%, 20px); top:60px; width:360px; max-width:94vw;
+    background:linear-gradient(180deg,#341e15,#24130d); border:1px solid rgba(255,255,255,.14); border-radius:16px; padding:14px; z-index:21; display:none;
+    opacity:0; transition: transform .25s ease, opacity .25s ease;}
+  .modal.active{display:block; opacity:1; transform:translate(-50%, 0);}
+  .label{font-size:12px; color:var(--muted); margin:8px 0 6px; text-transform:uppercase; letter-spacing:.08em;}
+  .pill{background:var(--chip); border:1px solid rgba(255,255,255,.18); border-radius:999px; padding:8px 12px; color:var(--fg); font-size:14px; cursor:pointer;}
+  input[type=range]{width:100%; accent-color:var(--primary-2);}
+
+  .select{width:100%; background: var(--select-bg); color: var(--select-text); border: 1px solid var(--select-border);
+    padding: 10px 12px; border-radius: 12px; font-size: 15px; appearance: none; outline: none;}
+  .select option{background: var(--select-bg); color: var(--select-text);}
+
+  .toggle{display:flex; align-items:center; justify-content:space-between; gap:10px; cursor:pointer; padding:10px 12px; border-radius:12px;
+    background:rgba(255,255,255,.06); color:var(--muted); border:1px solid rgba(255,255,255,.18);}
+  .toggle strong{color:var(--muted); font-weight:800;}
+  .toggle input{appearance:none; width:46px; height:26px; border-radius:999px; background:#4a2a1e; position:relative; outline:none; border:1px solid rgba(255,255,255,.22); transition:background .2s;}
+  .toggle input:checked{background:#ff8a3d;}
+  .toggle input:before{content:""; position:absolute; top:2px; left:2px; width:20px; height:20px; background:#ffe7d6; border-radius:50%; transition:left .18s;}
+  .toggle input:checked:before{left:24px;}
+
+  .disabled{opacity:.5; pointer-events:none;}
+  .disabled .pill{background:var(--disabled); color:var(--disabled-text); border-color:rgba(255,255,255,.12);}
+  .disabled input[type=range]{opacity:.6;}
+
+  #result{display:none; flex:1 1 auto; padding:12px; overflow:auto;}
+  .card{background:var(--card); border:1px solid rgba(255,255,255,.12); border-radius:16px; padding:16px; box-shadow:0 14px 40px rgba(0,0,0,.55);
+    animation: fadeIn .25s ease;}
+  .result-controls{display:flex; gap:10px; margin-top:12px;}
+
+  .list-item{display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px dashed rgba(255,255,255,.12);}
+  .list-meta{font-size:12px; color:var(--muted);}
+
+  @keyframes fadeIn{from{opacity:0; transform:translateY(8px);} to{opacity:1; transform:translateY(0);}}
+</style>
+</head>
+<body>
+  <div class="phone">
+    <header>
+      <h1><span class="dot"></span> Mealr</h1>
+      <div class="right">
+        <button id="btnHistory" class="iconbtn" title="History">🕘</button>
+        <button id="btnFavs" class="iconbtn" title="Favorites">❤️</button>
+        <button id="btnSettings" class="iconbtn" aria-label="Settings">⚙️</button>
+      </div>
+    </header>
+
+    <main id="swipe">
+      <div id="stack" class="stack"></div>
+      <div class="controls">
+        <button id="btnSkip" class="btn">略過</button>
+        <button id="btnChoose" class="btn primary">選這家</button>
+      </div>
+      <div id="hintKeys" class="hint">提示：可以左右滑動卡片；也可用按鈕操作。</div>
+    </main>
+
+    <section id="result">
+      <div id="resultCard" class="card"></div>
+      <div class="result-controls">
+        <button id="btnBack" class="btn">返回</button>
+        <button id="btnFav" class="btn primary">收藏</button>
+      </div>
+    </section>
+  </div>
+
+  <div id="overlay" class="overlay"></div>
+  <div id="modal" class="modal" role="dialog" aria-modal="true">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+      <div class="label" id="mTitle">設定</div>
+      <button id="btnClose" class="iconbtn">✕</button>
+    </div>
+    <label class="toggle" style="margin-top:2px;">
+      <strong id="lblBlind">盲選模式（隱藏名稱與照片，避免偏見）</strong>
+      <input id="blind" type="checkbox" />
+    </label>
+    <div id="filtersBlock" style="margin-top:10px;">
+      <div class="label" id="lblBudget">預算（TWD）</div>
+      <div class="row"><span id="budgetShow" class="pill">≤ 300</span></div>
+      <input id="budget" type="range" min="120" max="1000" step="10" value="300" />
+      <div class="hint" id="hintBudget">拖曳設定你的最高花費。</div>
+
+      <div class="label" id="lblVibe">氛圍</div>
+      <div class="row" id="vibeRow">
+        <button class="pill" data-vibe="quiet">安靜</button>
+        <button class="pill" data-vibe="casual">輕鬆</button>
+        <button class="pill" data-vibe="fast">快速</button>
+        <button class="pill" data-vibe="group">適合多人</button>
+      </div>
+
+      <div class="label" id="lblCuisine">料理類型</div>
+      <div class="row" id="cuisineRow">
+        <button class="pill" data-cuisine="sushi">壽司</button>
+        <button class="pill" data-cuisine="bento">便當</button>
+        <button class="pill" data-cuisine="noodles">麵食</button>
+        <button class="pill" data-cuisine="thai">泰式</button>
+        <button class="pill" data-cuisine="rice">丼飯/蓋飯</button>
+        <button class="pill" data-cuisine="vegan">蔬食</button>
+      </div>
+    </div>
+    <div class="label" id="lblLang" style="margin-top:12px;">語言</div>
+    <select id="langSelModal" class="select">
+      <option value="zh">繁體中文</option>
+      <option value="en">English</option>
+    </select>
+    <div style="display:flex; gap:10px; margin-top:12px; justify-content:flex-end;">
+      <button id="applySettings" class="btn primary" style="width:auto;">套用</button>
+    </div>
+  </div>
+
+  <div id="favOverlay" class="overlay"></div>
+  <div id="favModal" class="modal" role="dialog" aria-modal="true">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <div class="label" id="favTitle">收藏清單</div>
+      <button id="favClose" class="iconbtn">✕</button>
+    </div>
+    <div id="favList" style="margin-top:6px;"></div>
+  </div>
+
+  <div id="histOverlay" class="overlay"></div>
+  <div id="histModal" class="modal" role="dialog" aria-modal="true">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <div class="label" id="histTitle">歷史紀錄</div>
+      <button id="histClose" class="iconbtn">✕</button>
+    </div>
+    <div id="histList" style="margin-top:6px;"></div>
+  </div>
+
+<script>
+const I18N = {
+  zh: {settings:"設定", language:"語言", skip:"略過", choose:"選這家", back:"返回", shuffle:"重新洗牌",
+       hintKeys:"提示：可以左右滑動卡片；也可用按鈕操作。", budget:"預算（TWD）", vibe:"氛圍", cuisines:"料理類型",
+       blind:"盲選模式（隱藏名稱與照片，避免偏見）", noMatches:"沒有符合條件的店家，試著放寬條件。",
+       todaysPick:"今日推薦", hours:"營業時間", yourPick:"你的選擇", distance:"距離", favorites:"收藏清單", fav:"收藏",
+       history:"歷史紀錄", remove:"移除", emptyFav:"尚未收藏", emptyHist:"尚無紀錄", like:"選這家", nope:"略過"},
+  en: {settings:"Settings", language:"Language", skip:"Skip", choose:"Choose", back:"Back", shuffle:"Shuffle",
+       hintKeys:"Tip: swipe left/right; or use buttons.", budget:"Budget (TWD)", vibe:"Vibe", cuisines:"Cuisines",
+       blind:"Blind Mode (hide names/photos)", noMatches:"No matches. Try widening filters.",
+       todaysPick:"Today's Pick", hours:"Hours", yourPick:"Your pick", distance:"Distance", favorites:"Favorites", fav:"Favorite",
+       history:"History", remove:"Remove", emptyFav:"No favorites yet", emptyHist:"No history yet", like:"Choose", nope:"Skip"}
+};
+let lang = localStorage.getItem("mealr_lang") || (navigator.language && navigator.language.startsWith("zh")? "zh":"en");
+
+const RESTAURANTS = [
+  { id:1, name_zh:"鮨青", name_en:"Ao Sushi", cuisine:["sushi"], vibe:["quiet","casual"], price:280, rating:4.5, time:"11:30–14:30", note:{en:"Counter seats, mini omakase", zh:"吧檯座，迷你無菜單"} },
+  { id:2, name_zh:"木禾便當", name_en:"Muhe Bento", cuisine:["bento","rice"], vibe:["fast","casual"], price:120, rating:4.2, time:"11:00–20:00", note:{en:"Lean options", zh:"清爽選項"} },
+  { id:3, name_zh:"小山壽司", name_en:"Koyama Sushi", cuisine:["sushi"], vibe:["quiet"], price:320, rating:4.3, time:"11:30–14:00", note:{en:"Calm vibe, soft music", zh:"安靜氛圍，輕音樂"} },
+  { id:4, name_zh:"清湯拉麵", name_en:"Light Broth Ramen", cuisine:["noodles"], vibe:["fast"], price:180, rating:4.0, time:"11:00–21:00", note:{en:"Light broth", zh:"清爽湯頭"} },
+  { id:5, name_zh:"泰泰", name_en:"ThaiThai", cuisine:["thai"], vibe:["group","casual"], price:260, rating:4.4, time:"11:00–15:00", note:{en:"Great for sharing", zh:"適合分食"} },
+  { id:6, name_zh:"米食堂", name_en:"Rice House", cuisine:["rice","vegan"], vibe:["quiet"], price:200, rating:4.1, time:"11:00–14:00", note:{en:"Plant-forward bowls", zh:"植物系碗餐"} },
+  { id:7, name_zh:"商午便當", name_en:"Office Lunch Bento", cuisine:["bento"], vibe:["fast","casual"], price:130, rating:3.9, time:"11:00–14:00", note:{en:"Quick & cheap", zh:"快速實惠"} },
+  { id:8, name_zh:"炭烤丼", name_en:"Charcoal Don", cuisine:["rice"], vibe:["casual","group"], price:240, rating:4.2, time:"11:30–14:30", note:{en:"Charcoal grill", zh:"炭烤香氣"} },
+  { id:9, name_zh:"靜謐壽司", name_en:"Serene Sushi", cuisine:["sushi"], vibe:["quiet"], price:290, rating:4.6, time:"12:00–14:30", note:{en:"Low-noise policy", zh:"低噪音規則"} },
+  { id:10, name_zh:"蔬食麵所", name_en:"Veggie Noodle", cuisine:["vegan","noodles"], vibe:["quiet","casual"], price:190, rating:4.0, time:"11:00–14:30", note:{en:"No garlic/onion options", zh:"可選五辛素"} }
+];
+
+let filters = JSON.parse(localStorage.getItem("mealr_filters") || '{"budget":300,"vibes":[],"cuisines":[],"blind":false}');
+filters.vibes = new Set(filters.vibes); filters.cuisines = new Set(filters.cuisines);
+let blindMode = !!filters.blind;
+let pool = []; let index = 0; let current = null;
+let favs = JSON.parse(localStorage.getItem("mealr_favs")||"[]");
+let history = JSON.parse(localStorage.getItem("mealr_hist")||"[]");
+
+const $ = s => document.querySelector(s);
+function t(k){ return I18N[lang][k]; }
+function nameOf(r){ return lang==="zh" ? r.name_zh : r.name_en; }
+function saveFilters(){ localStorage.setItem("mealr_filters", JSON.stringify({budget:filters.budget, vibes:[...filters.vibes], cuisines:[...filters.cuisines], blind:blindMode})); }
+function applyFilters(){
+  let arr = RESTAURANTS.filter(r => r.price <= (filters.budget || 300));
+  if (filters.vibes.size) arr = arr.filter(r => [...filters.vibes].every(v => r.vibe.includes(v)));
+  if (filters.cuisines.size) arr = arr.filter(r => r.cuisine.some(c => filters.cuisines.has(c)));
+  return arr;
+}
+function renderText(){
+  $("#btnSkip").textContent=t("skip"); $("#btnChoose").textContent=t("choose"); $("#btnBack").textContent=t("back"); $("#btnFav").textContent=t("fav");
+  $("#hintKeys").textContent=t("hintKeys"); $("#mTitle").textContent=t("settings"); $("#lblLang").textContent=t("language");
+  $("#lblBudget").textContent=t("budget"); $("#lblVibe").textContent=t("vibe"); $("#lblCuisine").textContent=t("cuisines"); $("#lblBlind").textContent=t("blind");
+  $("#favTitle").textContent=t("favorites"); $("#histTitle").textContent=t("history");
+}
+function renderStack(){
+  const stack=$("#stack"); stack.innerHTML="";
+  const topN = pool.slice(index, index+3);
+  if(!topN.length){ stack.innerHTML = `<div class="empty">${t("noMatches")}</div>`; return; }
+  const cuMap = lang==="zh"? {sushi:"壽司", bento:"便當", noodles:"麵食", thai:"泰式", rice:"丼飯/蓋飯", vegan:"蔬食"} :
+                             {sushi:"Sushi", bento:"Bento", noodles:"Noodles", thai:"Thai", rice:"Rice", vegan:"Vegan"};
+  const vibeMap = lang==="zh"? {quiet:"安靜", casual:"輕鬆", fast:"快速", group:"適合多人"} :
+                               {quiet:"Quiet", casual:"Casual", fast:"Fast", group:"Group-friendly"};
+  topN.forEach((r,i)=>{
+    const card=document.createElement("div"); card.className="swipe-card";
+    card.style.transform=`translateY(${i*8}px) scale(${1-i*0.02})`; card.style.opacity=1-i*0.05;
+    const title = blindMode ? t("todaysPick") : nameOf(r);
+    const meta = `${blindMode? "—" : "★ " + r.rating.toFixed(1)} • ${blindMode? "—" : r.cuisine.map(c=>cuMap[c]).join(", ")} • <span class="price">≈ ${r.price} TWD</span>`;
+    const chips = r.vibe.map(v=>`<span class="chip">${vibeMap[v]}</span>`).join("");
+    const note = blindMode ? (lang==="zh"?"盲選模式：細節隱藏":"Details hidden (Blind Mode)") : r.note[lang];
+    const hours = blindMode ? "" : `${t("hours")}: ${r.time}`;
+    card.innerHTML = `<div class="badge like" id="badgeLike">${t("like")}</div>
+      <div class="badge nope" id="badgeNope">${t("nope")}</div>
+      <div class="title">${title}</div>
+      <div class="meta">${meta}</div>
+      <div class="row">${chips}</div>
+      <div style="color:#ffe7d6;">${note}</div>
+      <div class="hint">${hours}</div>`;
+    if(i===0) attachDrag(card);
+    stack.appendChild(card);
+  });
+}
+function show(screen){
+  if(screen==="swipe"){ $("#swipe").style.display="flex"; $("#result").style.display="none"; renderStack(); }
+  else { $("#swipe").style.display="none"; $("#result").style.display="block"; }
+}
+function choose(r){
+  current = r;
+  history.unshift({id:r.id, ts: Date.now()}); history = history.slice(0, 50);
+  localStorage.setItem("mealr_hist", JSON.stringify(history));
+
+  const cuMap = lang==="zh"? {sushi:"壽司", bento:"便當", noodles:"麵食", thai:"泰式", rice:"丼飯/蓋飯", vegan:"蔬食"} :
+                             {sushi:"Sushi", bento:"Bento", noodles:"Noodles", thai:"Thai", rice:"Rice", vegan:"Vegan"};
+  const vibeMap = lang==="zh"? {quiet:"安靜", casual:"輕鬆", fast:"快速", group:"適合多人"} :
+                               {quiet:"Quiet", casual:"Casual", fast:"Fast", group:"Group-friendly"};
+  const rname = blindMode ? t("yourPick") : nameOf(r);
+  const rating = blindMode ? "" : `★ ${r.rating.toFixed(1)} • `;
+  const cuisine = r.cuisine.map(c=>cuMap[c]).join(", ");
+  const price = `≈ ${r.price} TWD`;
+  const note = blindMode ? (lang==="zh"?"盲選模式：到店揭曉！":"Blind Mode: reveal by visiting!") : r.note[lang];
+  $("#resultCard").innerHTML = `<div class="title">${rname}</div>
+    <div class="meta" style="margin:6px 0 10px;">${rating}${cuisine} • <span class="price">${price}</span></div>
+    <div class="row">${r.vibe.map(v=>`<span class="chip">${vibeMap[v]}</span>`).join("")}</div>
+    <div style="margin-top:10px; color:#ffe7d6;">${note}</div>`;
+  show("result");
+}
+function nextCard(liked){
+  const r = pool[index];
+  if(!r){ show("result"); return; }
+  if(liked){ choose(r); return; }
+  index++; if(index>=pool.length) index=0;
+  renderStack();
+}
+function refreshPool(){ pool = applyFilters(); index=0; renderStack(); }
+
+let startX=0, currentX=0, dragging=false;
+function attachDrag(card){
+  const likeBadge = card.querySelector("#badgeLike");
+  const nopeBadge = card.querySelector("#badgeNope");
+  const threshold = 90;
+  const onStart = (x)=>{ dragging=true; startX=x; card.style.transition="none"; likeBadge.style.opacity=0; nopeBadge.style.opacity=0; };
+  const onMove = (x)=>{
+    if(!dragging) return;
+    currentX = x - startX;
+    const rot = currentX/20; const prog = Math.min(1, Math.abs(currentX)/150);
+    card.style.transform = `translate(${currentX}px,0) rotate(${rot}deg)`;
+    card.style.opacity = String(Math.max(0.35, 1 - Math.abs(currentX)/320));
+    if(currentX>0){ likeBadge.style.opacity = prog; nopeBadge.style.opacity = 0; } else { likeBadge.style.opacity = 0; nopeBadge.style.opacity = prog; }
+  };
+  const onEnd = ()=>{
+    if(!dragging) return;
+    dragging=false; card.style.transition="";
+    if(Math.abs(currentX) > threshold){
+      const liked = currentX>0;
+      card.style.transform = `translate(${liked? 480:-480}px,0) rotate(${liked?15:-15}deg)`;
+      setTimeout(()=> nextCard(liked), 140);
+    }else{
+      card.style.transform = ""; card.style.opacity = "1"; likeBadge.style.opacity=0; nopeBadge.style.opacity=0;
+    }
+    currentX=0;
+  };
+  card.ontouchstart = e=> onStart(e.touches[0].clientX);
+  card.ontouchmove  = e=> onMove(e.touches[0].clientX);
+  card.ontouchend   = onEnd;
+  card.onmousedown = e=>{ onStart(e.clientX); };
+  window.onmousemove = e=> onMove(e.clientX);
+  window.onmouseup = onEnd;
+}
+
+function renderFavs(){
+  const list = $("#favList"); list.innerHTML="";
+  if(!favs.length){ list.innerHTML = `<div class="empty">${t("emptyFav")}</div>`; return; }
+  favs.forEach(id=>{
+    const r = RESTAURANTS.find(x=>x.id===id); if(!r) return;
+    const row = document.createElement("div"); row.className="list-item";
+    row.innerHTML = `<div>${nameOf(r)} · <span class="price">≈ ${r.price} TWD</span></div>
+      <button data-id="${id}" class="iconbtn">${t("remove")}</button>`;
+    row.querySelector("button").onclick = (e)=>{
+      const rid = +e.target.getAttribute("data-id");
+      favs = favs.filter(x=>x!==rid);
+      localStorage.setItem("mealr_favs", JSON.stringify(favs));
+      renderFavs();
+    };
+    list.appendChild(row);
+  });
+}
+function addFav(r){ if(!favs.includes(r.id)){ favs.unshift(r.id); localStorage.setItem("mealr_favs", JSON.stringify(favs)); } }
+
+function renderHistory(){
+  const list = $("#histList"); list.innerHTML="";
+  if(!history.length){ list.innerHTML = `<div class="empty">${t("emptyHist")}</div>`; return; }
+  history.forEach(item=>{
+    const r = RESTAURANTS.find(x=>x.id===item.id); if(!r) return;
+    const row = document.createElement("div"); row.className="list-item";
+    const timeStr = new Date(item.ts).toLocaleString(lang==="zh"?"zh-TW":"en-US");
+    row.innerHTML = `<div><div>${nameOf(r)} · <span class="price">≈ ${r.price} TWD</span></div><div class="list-meta">${timeStr}</div></div>
+      <button data-ts="${item.ts}" class="iconbtn">${t("remove")}</button>`;
+    row.querySelector("button").onclick = (e)=>{
+      const ts = +e.target.getAttribute("data-ts");
+      history = history.filter(x=>x.ts!==ts);
+      localStorage.setItem("mealr_hist", JSON.stringify(history));
+      renderHistory();
+    };
+    list.appendChild(row);
+  });
+}
+
+// Settings modal wiring
+const overlay = $("#overlay"), modal = $("#modal");
+function openModal(){ overlay.classList.add("active"); modal.classList.add("active"); syncUIFromState(); }
+function closeModal(){ overlay.classList.remove("active"); modal.classList.remove("active"); }
+$("#btnSettings").addEventListener("click", openModal);
+$("#btnClose").addEventListener("click", closeModal);
+overlay.addEventListener("click", closeModal);
+
+function syncUIFromState(){
+  $("#langSelModal").value = lang;
+  $("#budget").value = filters.budget || 300;
+  $("#budgetShow").textContent = "≤ " + $("#budget").value;
+  $("#blind").checked = blindMode;
+  $("#vibeRow").querySelectorAll("button").forEach(b=>{ b.classList.remove("active"); b.style.background="var(--chip)"; b.style.color="var(--fg)"; });
+  $("#cuisineRow").querySelectorAll("button").forEach(b=>{ b.classList.remove("active"); b.style.background="var(--chip)"; b.style.color="var(--fg)"; });
+  filters.vibes.forEach(v=>{ const b=$("#vibeRow").querySelector(`[data-vibe="${v}"]`); if(b){ b.classList.add("active"); b.style.background="linear-gradient(180deg, var(--primary), var(--primary-2))"; b.style.color="#220b07"; }});
+  filters.cuisines.forEach(c=>{ const b=$("#cuisineRow").querySelector(`[data-cuisine="${c}"]`); if(b){ b.classList.add("active"); b.style.background="#4a2a1e"; b.style.color="#ffd29b"; }});
+  $("#filtersBlock").classList.toggle("disabled", blindMode);
+}
+
+$("#budget").addEventListener("input", e=> $("#budgetShow").textContent = "≤ " + e.target.value );
+$("#vibeRow").addEventListener("click", e=>{
+  const btn = e.target.closest("button[data-vibe]"); if(!btn || blindMode) return;
+  const k = btn.dataset.vibe;
+  if (filters.vibes.has(k)) { filters.vibes.delete(k); btn.style.background="var(--chip)"; btn.style.color="var(--fg)"; }
+  else { filters.vibes.add(k); btn.style.background="linear-gradient(180deg, var(--primary), var(--primary-2))"; btn.style.color="#220b07"; }
+});
+$("#cuisineRow").addEventListener("click", e=>{
+  const btn = e.target.closest("button[data-cuisine]"); if(!btn || blindMode) return;
+  const k = btn.dataset.cuisine;
+  if (filters.cuisines.has(k)) { filters.cuisines.delete(k); btn.style.background="var(--chip)"; btn.style.color="var(--fg)"; }
+  else { filters.cuisines.add(k); btn.style.background="#4a2a1e"; btn.style.color="#ffd29b"; }
+});
+$("#blind").addEventListener("change", e=>{ blindMode = e.target.checked; $("#filtersBlock").classList.toggle("disabled", blindMode); });
+
+$("#applySettings").addEventListener("click", ()=>{
+  filters.budget = +$("#budget").value; lang = $("#langSelModal").value;
+  localStorage.setItem("mealr_lang", lang);
+  saveFilters(); renderText(); refreshPool(); if(current) choose(current); closeModal();
+});
+
+// Favorites & History modals
+const favOverlay=$("#favOverlay"), favModal=$("#favModal");
+function openFav(){ favOverlay.classList.add("active"); favModal.classList.add("active"); renderFavs(); }
+function closeFav(){ favOverlay.classList.remove("active"); favModal.classList.remove("active"); }
+$("#btnFavs").addEventListener("click", openFav);
+$("#favClose").addEventListener("click", closeFav);
+favOverlay.addEventListener("click", closeFav);
+
+const histOverlay=$("#histOverlay"), histModal=$("#histModal");
+function openHist(){ histOverlay.classList.add("active"); histModal.classList.add("active"); renderHistory(); }
+function closeHist(){ histOverlay.classList.remove("active"); histModal.classList.remove("active"); }
+$("#btnHistory").addEventListener("click", openHist);
+$("#histClose").addEventListener("click", closeHist);
+histOverlay.addEventListener("click", closeHist);
+
+// Buttons
+$("#btnSkip").addEventListener("click", ()=> nextCard(false));
+$("#btnChoose").addEventListener("click", ()=> nextCard(true));
+$("#btnBack").addEventListener("click", ()=> show("swipe"));
+$("#btnFav").addEventListener("click", ()=>{ if(current) addFav(current); openFav(); });
+
+document.addEventListener("DOMContentLoaded", ()=>{ renderText(); refreshPool(); });
+</script>
+</body>
+</html>
